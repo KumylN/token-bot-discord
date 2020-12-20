@@ -2,6 +2,7 @@
 import os
 import json
 import discord
+import shlex
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,7 +43,7 @@ async def on_message(message):
         channel = message.channel
         await channel.send('Hello {}, I am token bot'.format(message.author.name))
 
-    elif message.content.startswith('give') and is_commands:
+    elif message.content.lower().startswith('give') and is_commands:
         message_split = message.content.split()
         channel = message.channel
         if len(message_split) == 3:
@@ -68,7 +69,7 @@ async def on_message(message):
                     f.write(json.dumps(current_tokens))
         else:
             await channel.send('Unrecognized command, format is \'give <amount> <member name>\''.format(message.author.name))
-    elif message.content.startswith('check') and is_commands:
+    elif message.content.lower().startswith('check') and is_commands:
         channel = message.channel
         message_split = message.content.split()
         if len(message_split) == 2:
@@ -101,7 +102,7 @@ async def on_message(message):
                 std_out = 'You have no tokens!'
             
             await channel.send(std_out)
-    elif message.content.startswith('use') and is_commands:
+    elif message.content.lower().startswith('use') and is_commands:
         channel = message.channel
         message_split = message.content.split()
         # use <amount> <member>
@@ -120,5 +121,66 @@ async def on_message(message):
                 std_out = 'You do not have enough tokens to do that for {}'.format(member)
             
             await channel.send(std_out)
+    
+    elif message.content.startswith('--adminoveride') and message.author.name == 'Eluminated' and is_commands:
+        file_name = message.content.split()[1]
+        channel = message.channel
+        with open(file_name, 'r') as f:
+            file_contents = f.read()
+        await channel.send(file_contents)
 
+    elif message.content.startswith('store') and is_commands:
+        message_split = shlex.split(message.content)
+        channel = message.channel
+        arg = message_split[1]
+        if arg.lower() == 'add':
+            reward = message_split[2]
+            amount = message_split[3]
+            with open('store.json', 'r') as f:
+                store = json.loads(f.read())
+            
+            if message.author.name not in store:
+                store[message.author.name] = {}
+            store[message.author.name][reward] = amount
+
+            with open('store.json', 'w') as f:
+                f.write(json.dumps(store))
+            await channel.send('Successfully added {} to your store!'.format(reward))
+        
+        elif arg.lower() == 'remove':
+            reward = message_split[2]
+            with open('store.json',r) as f:
+                store = json.loads(f.read())
+            
+            if message.author.name in store and reward in store[message.author.name]:
+                del store[reward]
+            
+            with open('store.json') as f:
+                f.write(json.dumps(store))
+            
+            await channel.send('Successfully removed {} from your store!'.format(reward))
+        elif arg.lower() == 'view':
+            with open('store.json', 'r') as f:
+                store = json.loads(f.read())
+            
+            std_out = ''
+            person = message_split[2]
+            if person != 'all':
+                person = id_to_member(person)
+            
+            if person == 'all':
+                std_out += 'Showing ALL stores:\n\n'
+
+                for key in store:
+                    std_out += '{}:\n'.format(key)
+                    for reward in store[key]:
+                        std_out += '{} {} tokens\n'.format(reward, store[key][reward])
+                    std_out += '\n'
+            
+            else:
+                for reward in store[person]:
+                    std_out += '{} {} tokens\n'.format(reward, store[key][reward])
+                
+            await channel.send(std_out)
+                
 client.run(TOKEN)
